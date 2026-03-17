@@ -10,9 +10,9 @@ namespace EmailParser.Services;
 public class MsgFileService
 {
     /// <summary>
-    /// Returns all emails parsed from .msg files found directly inside
-    /// <paramref name="directoryPath"/>.  Files that cannot be parsed are
-    /// skipped with a warning.
+    /// Returns all emails parsed from .msg files found inside
+    /// <paramref name="directoryPath"/> and its subdirectories. Files that
+    /// cannot be parsed are skipped with a warning.
     /// </summary>
     /// <param name="directoryPath">
     /// Path to an existing directory that contains one or more .msg files.
