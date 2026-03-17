@@ -1,4 +1,5 @@
-﻿using EmailParser.Models;
+﻿using System.IO.Compression;
+using EmailParser.Models;
 using EmailParser.Services;
 
 namespace EmailParser;
@@ -76,8 +77,9 @@ class Program
             int processed = 0;
             int failed = 0;
 
-            // Track used file names to handle duplicate subjects.
-            var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Track used file names per output directory to handle duplicate subjects.
+            var usedNames = new Dictionary<string, HashSet<string>>(
+                StringComparer.OrdinalIgnoreCase);
 
             foreach (var email in emails)
             {
@@ -85,13 +87,50 @@ class Program
                 if (string.IsNullOrWhiteSpace(safeSubject))
                     safeSubject = "No Subject";
 
-                // Append a counter if the same subject already appeared.
+                // Replicate the source subdirectory structure inside outputDir.
+                string emailOutputDir = outputDir;
+                if (isMsgDirectory && !string.IsNullOrEmpty(email.SourceFilePath))
+                {
+                    string sourceFileDir = Path.GetDirectoryName(email.SourceFilePath)
+                                          ?? folderPath;
+                    string relativeDir = Path.GetRelativePath(folderPath, sourceFileDir);
+                    if (!string.IsNullOrEmpty(relativeDir) && relativeDir != ".")
+                        emailOutputDir = Path.Combine(outputDir, relativeDir);
+                }
+
+                Directory.CreateDirectory(emailOutputDir);
+
+                // Append a counter if the same subject already appeared in this directory.
+                if (!usedNames.TryGetValue(emailOutputDir, out var dirUsedNames))
+                {
+                    dirUsedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    usedNames[emailOutputDir] = dirUsedNames;
+                }
+
                 string fileName = safeSubject;
-                int counter = 1;
-                while (!usedNames.Add(fileName))
+                int counter = 2;
+                while (!dirUsedNames.Add(fileName))
                     fileName = $"{safeSubject} ({counter++})";
 
-                string outputPath = Path.Combine(outputDir, fileName + ".pdf");
+                string outputPath = Path.Combine(emailOutputDir, fileName + ".pdf");
+
+                // Save original attachments to an "attachments" subfolder before the
+                // PDF service consumes (and then deletes) the temp files.
+                // Attachments go into  <emailOutputDir>/<subject>/attachments/
+                // so each email's attachments stay clearly associated with it.
+                if (email.Attachments.Count > 0)
+                {
+                    string attachmentsDir = Path.Combine(emailOutputDir, fileName, "attachments");
+                    try
+                    {
+                        SaveAttachmentsToFolder(email, attachmentsDir);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine(
+                            $"  Warning: Could not save attachments for '{email.Subject}': {ex.Message}");
+                    }
+                }
 
                 Console.Write($"  Processing: {email.Subject} ... ");
 
@@ -163,6 +202,135 @@ class Program
         ).ToArray();
 
         return Path.Combine(safeSegments);
+    }
+
+    // -------------------------------------------------------------------------
+    // Attachment saving helpers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Copies every attachment in <paramref name="email"/> to
+    /// <paramref name="attachmentsDir"/> in its original format.
+    /// ZIP attachments are extracted into a subfolder named after the archive.
+    /// </summary>
+    private static void SaveAttachmentsToFolder(EmailData email, string attachmentsDir)
+    {
+        Directory.CreateDirectory(attachmentsDir);
+
+        foreach (AttachmentData attachment in email.Attachments)
+        {
+            if (!File.Exists(attachment.TempFilePath))
+                continue;
+
+            string ext = Path.GetExtension(attachment.FileName);
+
+            if (string.Equals(ext, ".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                // Extract the ZIP into a subfolder named after the archive.
+                string zipFolderName = SanitizeFileName(
+                    Path.GetFileNameWithoutExtension(attachment.FileName));
+                if (string.IsNullOrWhiteSpace(zipFolderName))
+                    zipFolderName = "archive";
+
+                string zipExtractDir = GetUniqueDirectoryPath(attachmentsDir, zipFolderName);
+                ExtractZipToFolder(attachment.TempFilePath, zipExtractDir);
+            }
+            else
+            {
+                string safeFileName = SanitizeFileName(attachment.FileName);
+                if (string.IsNullOrWhiteSpace(safeFileName))
+                    safeFileName = "attachment" + ext;
+
+                string destPath = GetUniqueFilePath(attachmentsDir, safeFileName);
+                File.Copy(attachment.TempFilePath, destPath, overwrite: false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Extracts a ZIP archive to <paramref name="extractDir"/> using a
+    /// zip-slip safe extraction strategy.
+    /// </summary>
+    private static void ExtractZipToFolder(string zipPath, string extractDir)
+    {
+        Directory.CreateDirectory(extractDir);
+        string canonicalExtractDir = Path.GetFullPath(extractDir)
+            + Path.DirectorySeparatorChar;
+
+        try
+        {
+            using var archive = ZipFile.OpenRead(zipPath);
+            foreach (var entry in archive.Entries)
+            {
+                // Skip directory-only entries.
+                if (string.IsNullOrEmpty(entry.Name))
+                    continue;
+
+                string destPath = Path.GetFullPath(
+                    Path.Combine(extractDir, entry.FullName));
+
+                // Zip-slip guard: skip entries that escape the target directory.
+                if (!destPath.StartsWith(canonicalExtractDir,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine(
+                        $"  Warning: Skipping ZIP entry with unsafe path: '{entry.FullName}'");
+                    continue;
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(destPath) ?? extractDir);
+                entry.ExtractToFile(destPath, overwrite: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(
+                $"  Warning: Could not extract ZIP '{zipPath}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Returns a path for a new file inside <paramref name="directory"/>.
+    /// If <paramref name="fileName"/> already exists, appends a numeric
+    /// counter (e.g. "report (2).docx") until a free name is found.
+    /// </summary>
+    private static string GetUniqueFilePath(string directory, string fileName)
+    {
+        string dest = Path.Combine(directory, fileName);
+        if (!File.Exists(dest))
+            return dest;
+
+        string nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+        string ext = Path.GetExtension(fileName);
+        int counter = 2;
+        do
+        {
+            dest = Path.Combine(directory, $"{nameWithoutExt} ({counter++}){ext}");
+        }
+        while (File.Exists(dest));
+
+        return dest;
+    }
+
+    /// <summary>
+    /// Returns a path for a new subdirectory inside <paramref name="parent"/>.
+    /// If the name already exists, appends a numeric counter until free.
+    /// </summary>
+    private static string GetUniqueDirectoryPath(string parent, string name)
+    {
+        string dest = Path.Combine(parent, name);
+        if (!Directory.Exists(dest))
+            return dest;
+
+        int counter = 2;
+        string candidate;
+        do
+        {
+            candidate = Path.Combine(parent, $"{name} ({counter++})");
+        }
+        while (Directory.Exists(candidate));
+
+        return candidate;
     }
 }
 

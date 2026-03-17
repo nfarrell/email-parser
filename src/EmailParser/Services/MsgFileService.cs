@@ -20,7 +20,7 @@ public class MsgFileService
     public IEnumerable<EmailData> GetEmailsFromDirectory(string directoryPath)
     {
         string[] msgFiles = Directory.GetFiles(
-            directoryPath, "*.msg", SearchOption.TopDirectoryOnly);
+            directoryPath, "*.msg", SearchOption.AllDirectories);
 
         if (msgFiles.Length == 0)
         {
@@ -42,6 +42,7 @@ public class MsgFileService
                 continue;
             }
 
+            email.SourceFilePath = msgFile;
             yield return email;
         }
     }

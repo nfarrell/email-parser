@@ -12,6 +12,12 @@ public class EmailData
     public string From { get; set; } = string.Empty;
     public string To { get; set; } = string.Empty;
     public List<AttachmentData> Attachments { get; set; } = new();
+
+    /// <summary>
+    /// Full path of the source .msg file, when the email was read from disk.
+    /// Empty string when the email was read via Outlook COM interop.
+    /// </summary>
+    public string SourceFilePath { get; set; } = string.Empty;
 }
 
 /// <summary>
