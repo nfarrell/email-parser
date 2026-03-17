@@ -1,4 +1,5 @@
 ﻿using System.IO.Compression;
+using System.Text;
 using EmailParser.Models;
 using EmailParser.Services;
 
@@ -8,6 +9,8 @@ class Program
 {
     static void Main(string[] args)
     {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
         Console.WriteLine("Email Parser — Save Outlook Emails to PDF");
         Console.WriteLine("==========================================");
         Console.WriteLine();
