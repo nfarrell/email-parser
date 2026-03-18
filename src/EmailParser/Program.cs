@@ -55,8 +55,8 @@ class Program
                 ?? "Messages")
             : SanitizePath(folderPath);
 
-        string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        string outputDir = Path.Combine(documentsPath, "EmailParser", outputSubDir);
+        string documentsPath = @"C:\Users\JessicaAnyanwu\DC\ACCDocs\Suir Engineering\Suir Eng Sandbox\Project Files\Jessica\Email tet\test 5";
+        string outputDir = Path.Combine(documentsPath, outputSubDir);
         Directory.CreateDirectory(outputDir);
 
         if (isMsgDirectory)
