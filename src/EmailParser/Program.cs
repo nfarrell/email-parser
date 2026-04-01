@@ -61,11 +61,11 @@ class Program
         // -----------------------------------------------------------------------
         // 3. Load the latest Excel data dictionary for terms to strip.
         // -----------------------------------------------------------------------
-        IReadOnlyList<string> threadPrefixPatterns;
+        IReadOnlyList<string> dictionaryPatterns;
         try
         {
-            var dictionary = LoadLatestThreadPrefixDictionary(dataDictionaryDir);
-            threadPrefixPatterns = dictionary.Patterns;
+            var dictionary = LoadLatestDataDictionary(dataDictionaryDir);
+            dictionaryPatterns = dictionary.Patterns;
 
             if (dictionary.SourcePath is null)
             {
@@ -75,7 +75,7 @@ class Program
             else
             {
                 Console.WriteLine($"Data dictionary: {dictionary.SourcePath}");
-                Console.WriteLine($"Terms loaded   : {threadPrefixPatterns.Count}");
+                Console.WriteLine($"Terms loaded   : {dictionaryPatterns.Count}");
             }
         }
         catch (Exception ex)
@@ -94,7 +94,7 @@ class Program
                 ?? "Messages")
             : SanitizePath(folderPath);
 
-        outputSubDir = StripThreadPrefixes(outputSubDir, threadPrefixPatterns);
+        outputSubDir = StripDictionaryTerms(outputSubDir, dictionaryPatterns);
         if (string.IsNullOrWhiteSpace(outputSubDir))
             outputSubDir = "Messages";
 
@@ -130,7 +130,7 @@ class Program
             foreach (var email in emails)
             {
                 string safeSubject = SanitizeFileName(email.Subject);
-                safeSubject = StripThreadPrefixes(safeSubject, threadPrefixPatterns);
+                safeSubject = StripDictionaryTerms(safeSubject, dictionaryPatterns);
                 if (string.IsNullOrWhiteSpace(safeSubject))
                     safeSubject = "No Subject";
 
@@ -143,7 +143,7 @@ class Program
                     string relativeDir = Path.GetRelativePath(folderPath, sourceFileDir);
                     if (!string.IsNullOrEmpty(relativeDir) && relativeDir != ".")
                     {
-                        relativeDir = StripThreadPrefixes(relativeDir, threadPrefixPatterns);
+                        relativeDir = StripDictionaryTerms(relativeDir, dictionaryPatterns);
                         emailOutputDir = Path.Combine(outputDir, relativeDir);
                     }
                 }
@@ -201,13 +201,13 @@ class Program
             if (msgService?.LongPaths.Count > 0)
             {
                 string reportPath = Path.Combine(reportsDir,
-                    $"LongPaths_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+                    $"FilePathReport_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
                 Console.WriteLine(
-                    $"Writing long path report ({msgService.LongPaths.Count} paths over 250 chars)...");
+                    $"Writing file path report ({msgService.LongPaths.Count} paths over 250 chars)...");
                 try
                 {
                     WriteLongPathReport(msgService.LongPaths, reportPath);
-                    Console.WriteLine($"Long path report : {reportPath}");
+                    Console.WriteLine($"File path report : {reportPath}");
                 }
                 catch (Exception ex)
                 {
@@ -242,9 +242,9 @@ class Program
     private static readonly HashSet<char> InvalidFileNameChars =
         new(Path.GetInvalidFileNameChars());
 
-    private sealed record ThreadPrefixDictionary(string DirectoryPath, string? SourcePath, IReadOnlyList<string> Patterns);
+    private sealed record DataDictionary(string DirectoryPath, string? SourcePath, IReadOnlyList<string> Patterns);
 
-    private static ThreadPrefixDictionary LoadLatestThreadPrefixDictionary(string dictionaryDir)
+    private static DataDictionary LoadLatestDataDictionary(string dictionaryDir)
     {
         Directory.CreateDirectory(dictionaryDir);
 
@@ -261,10 +261,10 @@ class Program
             .FirstOrDefault();
 
         if (latestExcelFile is null)
-            return new ThreadPrefixDictionary(dictionaryDir, null, Array.Empty<string>());
+            return new DataDictionary(dictionaryDir, null, Array.Empty<string>());
 
         var patterns = LoadPatternsFromExcel(latestExcelFile);
-        return new ThreadPrefixDictionary(dictionaryDir, latestExcelFile, patterns);
+        return new DataDictionary(dictionaryDir, latestExcelFile, patterns);
     }
 
     private static IReadOnlyList<string> LoadPatternsFromExcel(string excelPath)
@@ -423,33 +423,29 @@ class Program
     }
 
     /// <summary>
-    /// Strips prefixes and patterns from the subject or folder name.
-    /// Patterns are matched case-insensitively at the start of the string.
+    /// Removes every dictionary term from anywhere within a file or folder name,
+    /// case-insensitively. After removal, consecutive spaces are collapsed and
+    /// any leading separators are trimmed.
+    /// Note: this method is intentionally NOT called for attachment file names.
     /// </summary>
-    private static string StripThreadPrefixes(string? text, IReadOnlyList<string> patterns)
+    private static string StripDictionaryTerms(string? text, IReadOnlyList<string> patterns)
     {
         if (string.IsNullOrWhiteSpace(text))
             return string.Empty;
 
         string result = text.Trim();
 
-        // Repeatedly strip prefixes until none match (to handle multiple prefixes).
-        bool changed = true;
-        while (changed)
+        foreach (string pattern in patterns)
         {
-            changed = false;
-            foreach (string pattern in patterns)
-            {
-                if (result.StartsWith(pattern, StringComparison.OrdinalIgnoreCase))
-                {
-                    result = result.Substring(pattern.Length).Trim();
-                    changed = true;
-                    break;
-                }
-            }
+            int idx;
+            while ((idx = result.IndexOf(pattern, StringComparison.OrdinalIgnoreCase)) >= 0)
+                result = result.Remove(idx, pattern.Length);
         }
 
-        // If normalization leaves leading separators/spaces, remove them.
+        // Collapse any runs of whitespace left behind by the removals.
+        result = string.Join(" ", result.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
+        // Remove any stray leading separators or spaces.
         result = result.TrimStart(' ', '-', '_').Trim();
 
         return result;
