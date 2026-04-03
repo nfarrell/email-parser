@@ -264,9 +264,7 @@ public class AttachmentProcessorTests : IDisposable
         return path;
     }
 
-    /// <summary>
-    /// Creates a minimal valid 1x1 PNG image.
-    /// </summary>
+    // Creates a minimal valid 1x1 PNG image.
     private string CreateMinimalPng()
     {
         string path = Path.Combine(_tempDir, $"test_{Guid.NewGuid():N}.png");
@@ -277,9 +275,7 @@ public class AttachmentProcessorTests : IDisposable
         return path;
     }
 
-    /// <summary>
-    /// Creates a minimal valid 1x1 BMP image.
-    /// </summary>
+    // Creates a minimal valid 1x1 BMP image.
     private string CreateMinimalBmp()
     {
         string path = Path.Combine(_tempDir, $"test_{Guid.NewGuid():N}.bmp");

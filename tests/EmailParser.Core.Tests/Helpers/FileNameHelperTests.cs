@@ -73,7 +73,7 @@ public class FileNameHelperTests
     public void SanitizeFileName_MixedValidAndInvalid_PreservesValidChars()
     {
         string result = FileNameHelper.SanitizeFileName("RE: Important Email");
-        Assert.StartsWith("RE_ Important Email", result);
+        Assert.Equal("RE_ Important Email", result);
     }
 
     // ───────────────────────── SanitizePath ─────────────────────────
