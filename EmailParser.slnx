@@ -4,4 +4,7 @@
     <Project Path="src/EmailParser.Core/EmailParser.Core.csproj" />
     <Project Path="src/EmailParser.UI/EmailParser.UI.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EmailParser.Core.Tests/EmailParser.Core.Tests.csproj" />
+  </Folder>
 </Solution>
