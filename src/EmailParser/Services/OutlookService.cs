@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using EmailParser.Models;
 using Microsoft.Office.Interop.Outlook;
+using Serilog;
 
 namespace EmailParser.Services;
 
@@ -9,6 +10,8 @@ namespace EmailParser.Services;
 /// </summary>
 public class OutlookService
 {
+    private static readonly ILogger Log = Serilog.Log.ForContext<OutlookService>();
+
     /// <summary>
     /// Returns all <see cref="MailItem"/> objects found in the specified Outlook folder,
     /// with their attachments saved to temporary files.
@@ -21,6 +24,8 @@ public class OutlookService
     /// </param>
     public IEnumerable<EmailData> GetEmailsFromFolder(string folderPath)
     {
+        Log.Information("Connecting to Outlook to read folder {FolderPath}", folderPath);
+
         Application? outlookApp = null;
         NameSpace? nameSpace = null;
 
@@ -31,7 +36,10 @@ public class OutlookService
             nameSpace.Logon(Type.Missing, Type.Missing, false, false);
 
             MAPIFolder folder = ResolveFolder(nameSpace, folderPath);
+            Log.Information("Resolved Outlook folder: {FolderName}", folder.Name);
+
             Items items = folder.Items;
+            Log.Information("Found {Count} item(s) in folder", items.Count);
 
             foreach (object item in items)
             {
@@ -92,7 +100,10 @@ public class OutlookService
             {
                 GetActiveObject(ref clsid, IntPtr.Zero, out object obj);
                 if (obj is Application existing)
+                {
+                    Log.Debug("Attached to existing Outlook instance");
                     return existing;
+                }
             }
         }
         catch
@@ -102,6 +113,7 @@ public class OutlookService
 
         try
         {
+            Log.Debug("Creating new Outlook application instance");
             return new Application();
         }
         catch (System.Exception ex) when (OfficeAvailability.IsOfficeUnavailableException(ex))

@@ -8,6 +8,7 @@ using iText.Layout;
 using iText.Layout.Element;
 using Microsoft.Office.Interop.Excel;
 using Microsoft.Office.Interop.Word;
+using Serilog;
 
 namespace EmailParser.Services;
 
@@ -17,6 +18,8 @@ namespace EmailParser.Services;
 /// </summary>
 public class AttachmentProcessor
 {
+    private static readonly ILogger Log = Serilog.Log.ForContext<AttachmentProcessor>();
+
     private static readonly HashSet<string> ImageExtensions =
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -48,6 +51,8 @@ public class AttachmentProcessor
     public IReadOnlyList<string> ProcessAttachment(AttachmentData attachment)
     {
         string ext = System.IO.Path.GetExtension(attachment.FileName);
+        Log.Debug("Processing attachment {FileName} (extension: {Extension})",
+            attachment.FileName, ext);
 
         if (string.Equals(ext, ".zip", StringComparison.OrdinalIgnoreCase))
             return ProcessZipFile(attachment.TempFilePath);
@@ -88,8 +93,7 @@ public class AttachmentProcessor
                 // Zip-slip guard: reject entries that escape the extraction directory.
                 if (!destPath.StartsWith(canonicalExtractDir, StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.Error.WriteLine(
-                        $"  Warning: Skipping ZIP entry with unsafe path: '{entry.FullName}'");
+                    Log.Warning("Skipping ZIP entry with unsafe path: {EntryName}", entry.FullName);
                     continue;
                 }
 
@@ -116,8 +120,7 @@ public class AttachmentProcessor
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(
-                $"  Warning: Could not process ZIP '{zipPath}': {ex.Message}");
+            Log.Warning(ex, "Could not process ZIP {ZipPath}", zipPath);
         }
         finally
         {
@@ -155,10 +158,8 @@ public class AttachmentProcessor
             }
             catch (Exception ex) when (OfficeAvailability.IsOfficeUnavailableException(ex))
             {
-                Console.Error.WriteLine(
-                    $"  Warning: Skipping Word attachment '{originalFileName}' — " +
-                    "Microsoft Word is not installed or accessible. " +
-                    "Please install Microsoft Office to convert Word documents.");
+                Log.Warning("Skipping Word attachment {FileName} — Microsoft Word is not " +
+                    "installed or accessible", originalFileName);
                 return null;
             }
         }
@@ -171,16 +172,13 @@ public class AttachmentProcessor
             }
             catch (Exception ex) when (OfficeAvailability.IsOfficeUnavailableException(ex))
             {
-                Console.Error.WriteLine(
-                    $"  Warning: Skipping Excel attachment '{originalFileName}' — " +
-                    "Microsoft Excel is not installed or accessible. " +
-                    "Please install Microsoft Office to convert Excel documents.");
+                Log.Warning("Skipping Excel attachment {FileName} — Microsoft Excel is not " +
+                    "installed or accessible", originalFileName);
                 return null;
             }
         }
 
-        Console.Error.WriteLine(
-            $"  Warning: Skipping unsupported attachment type: '{originalFileName}'.");
+        Log.Warning("Skipping unsupported attachment type: {FileName}", originalFileName);
         return null;
     }
 
@@ -243,10 +241,7 @@ public class AttachmentProcessor
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(
-                $"  Warning: Failed to convert Word document '{wordPath}': {ex.Message}");
-
-            // Clean up the (empty) temp file if it was created.
+            Log.Warning(ex, "Failed to convert Word document {WordPath}", wordPath);
             TryDeleteFile(outputPath);
             return null;
         }
@@ -291,9 +286,7 @@ public class AttachmentProcessor
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(
-                $"  Warning: Failed to convert Excel document '{excelPath}': {ex.Message}");
-
+            Log.Warning(ex, "Failed to convert Excel document {ExcelPath}", excelPath);
             TryDeleteFile(outputPath);
             return null;
         }

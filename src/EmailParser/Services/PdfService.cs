@@ -1,6 +1,7 @@
 using EmailParser.Models;
 using iText.Html2pdf;
 using iText.Kernel.Pdf;
+using Serilog;
 
 namespace EmailParser.Services;
 
@@ -9,6 +10,8 @@ namespace EmailParser.Services;
 /// </summary>
 public class PdfService
 {
+    private static readonly ILogger Log = Serilog.Log.ForContext<PdfService>();
+
     // Public API
 
     /// <summary>
@@ -17,6 +20,8 @@ public class PdfService
     /// </summary>
     public void SaveEmailAsPdf(EmailData email, string outputPath)
     {
+        Log.Debug("Converting email '{Subject}' to PDF at {OutputPath}", email.Subject, outputPath);
+
         var tempFilesToDelete = new List<string>();
 
         try
@@ -31,6 +36,8 @@ public class PdfService
 
             // Copy the body PDF to the output path.
             File.Copy(bodyPdf, outputPath, overwrite: true);
+
+            Log.Debug("PDF created successfully at {OutputPath}", outputPath);
         }
         finally
         {

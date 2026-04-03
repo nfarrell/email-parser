@@ -1,5 +1,6 @@
 using EmailParser.Models;
 using MsgReader.Outlook;
+using Serilog;
 
 namespace EmailParser.Services;
 
@@ -9,6 +10,8 @@ namespace EmailParser.Services;
 /// </summary>
 public class MsgFileService
 {
+    private static readonly ILogger Log = Serilog.Log.ForContext<MsgFileService>();
+
     private readonly List<string> _longPaths = [];
 
     /// <summary>
@@ -27,19 +30,28 @@ public class MsgFileService
     /// </param>
     public IEnumerable<EmailData> GetEmailsFromDirectory(string directoryPath)
     {
+        Log.Information("Scanning for .msg files in {Directory}", directoryPath);
+
         string[] msgFiles = Directory.GetFiles(
             directoryPath, "*.msg", SearchOption.AllDirectories);
 
         if (msgFiles.Length == 0)
         {
-            Console.Error.WriteLine(
-                $"Warning: No .msg files found in '{directoryPath}'.");
+            Log.Warning("No .msg files found in {Directory}", directoryPath);
+        }
+        else
+        {
+            Log.Information("Found {Count} .msg file(s) to process", msgFiles.Length);
         }
 
         foreach (string msgFile in msgFiles)
         {
             if (msgFile.Length > 250)
+            {
+                Log.Warning("File path exceeds 250 characters: {FilePath} ({Length} chars)",
+                    msgFile, msgFile.Length);
                 _longPaths.Add(msgFile);
+            }
 
             EmailData email;
             try
@@ -48,11 +60,7 @@ public class MsgFileService
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(
-                    $"Warning: Could not read '{msgFile}': [{ex.GetType().Name}] {ex.Message}");
-                if (ex.InnerException is not null)
-                    Console.Error.WriteLine(
-                        $"         Inner: [{ex.InnerException.GetType().Name}] {ex.InnerException.Message}");
+                Log.Error(ex, "Could not read .msg file {FilePath}", msgFile);
                 continue;
             }
 
@@ -65,6 +73,8 @@ public class MsgFileService
 
     private static EmailData ReadMsgFile(string msgPath)
     {
+        Log.Debug("Reading .msg file {FilePath}", msgPath);
+
         using var msg = new Storage.Message(msgPath);
 
         var email = new EmailData
@@ -102,6 +112,9 @@ public class MsgFileService
                 TempFilePath = tempPath,
             });
         }
+
+        Log.Debug("Parsed email '{Subject}' with {AttachmentCount} attachment(s)",
+            email.Subject, email.Attachments.Count);
 
         return email;
     }
