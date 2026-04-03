@@ -35,16 +35,14 @@ public class AttachmentProcessor
             ".xls", ".xlsx", ".csv",
         };
 
-    // -------------------------------------------------------------------------
     // Public API
-    // -------------------------------------------------------------------------
 
     /// <summary>
     /// Converts a single attachment into one or more temporary PDF files.
     /// ZIP archives are extracted and each contained file is processed in turn.
     /// </summary>
     /// <returns>
-    /// Paths to temporary PDF files.  The caller is responsible for deleting
+    /// Paths to temporary PDF files. The caller is responsible for deleting
     /// every path in the returned list once it has been consumed.
     /// </returns>
     public IReadOnlyList<string> ProcessAttachment(AttachmentData attachment)
@@ -58,9 +56,7 @@ public class AttachmentProcessor
         return pdf is null ? Array.Empty<string>() : new[] { pdf };
     }
 
-    // -------------------------------------------------------------------------
     // ZIP handling
-    // -------------------------------------------------------------------------
 
     private IReadOnlyList<string> ProcessZipFile(string zipPath)
     {
@@ -131,13 +127,11 @@ public class AttachmentProcessor
         return results;
     }
 
-    // -------------------------------------------------------------------------
     // Generic file → PDF dispatcher
-    // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Converts a file at <paramref name="filePath"/> whose original name is
-    /// <paramref name="originalFileName"/> to a temporary PDF.
+    /// Converts a file at <paramref name="filePath"/> to a temporary PDF,
+    /// using <paramref name="originalFileName"/> to determine the file type.
     /// Returns <c>null</c> when the file type is not supported.
     /// </summary>
     private string? ConvertFileToPdf(string filePath, string originalFileName)
@@ -190,14 +184,9 @@ public class AttachmentProcessor
         return null;
     }
 
-    // -------------------------------------------------------------------------
     // Conversion methods
-    // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Copies an existing PDF to a fresh temp file so the caller owns the
-    /// lifetime and can safely delete it after use.
-    /// </summary>
+    /// <summary>Copies an existing PDF to a fresh temp file owned by the caller.</summary>
     private static string CopyToNewTempPdf(string sourcePdf)
     {
         string dest = TempPdfPath();
@@ -324,9 +313,7 @@ public class AttachmentProcessor
         }
     }
 
-    // -------------------------------------------------------------------------
     // Utility helpers
-    // -------------------------------------------------------------------------
 
     private static string TempPdfPath() =>
         System.IO.Path.Combine(

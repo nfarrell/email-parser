@@ -64,9 +64,7 @@ public class OutlookService
         }
     }
 
-    // -------------------------------------------------------------------------
     // Private helpers
-    // -------------------------------------------------------------------------
 
     // P/Invoke declarations to access the COM Running Object Table (ROT),
     // replicating Marshal.GetActiveObject which was removed in .NET 5+.

@@ -17,20 +17,13 @@ class Program
         Console.WriteLine("==========================================");
         Console.WriteLine();
 
-        // =======================================================================
-        // PATH CONFIGURATION
-        // Change these three lines to move files to a different location.
-        // =======================================================================
+        // PATH CONFIGURATION — change these lines to move files to a different location.
         string outputBaseDir     = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "EmailParser");
         string reportsDir        = @"C:\Users\JessicaAnyanwu\OneDrive - Suir Engineering Ltd\Documents\EmailParser\Email Parcer Directory";
         string dataDictionaryDir = reportsDir;  // data dictionary lives in the same folder as reports
-        // =======================================================================
 
-        // -----------------------------------------------------------------------
-        // 1. Resolve the source: an Outlook folder name or a local directory of
-        //    .msg files.
-        // -----------------------------------------------------------------------
+        // 1. Resolve the source: an Outlook folder name or a local directory of .msg files.
         string folderPath;
 
         if (args.Length > 0)
@@ -52,15 +45,10 @@ class Program
             Environment.Exit(1);
         }
 
-        // -----------------------------------------------------------------------
-        // 2. Determine whether the input is a local directory of .msg files
-        //    (Office-free mode) or an Outlook folder name (requires Outlook).
-        // -----------------------------------------------------------------------
+        // 2. True = local .msg files (Office-free); false = Outlook folder (requires Outlook).
         bool isMsgDirectory = Directory.Exists(folderPath);
 
-        // -----------------------------------------------------------------------
-        // 3. Load the latest Excel data dictionary for terms to strip.
-        // -----------------------------------------------------------------------
+        // 3. Load the latest Excel data dictionary for terms to strip from file names.
         IReadOnlyList<string> dictionaryPatterns;
         try
         {
@@ -85,9 +73,7 @@ class Program
             return;
         }
 
-        // -----------------------------------------------------------------------
-        // 4. Prepare output directory:  My Documents\EmailParser\<name>
-        // -----------------------------------------------------------------------
+        // 4. Prepare output directory: My Documents\EmailParser\<name>
         string outputSubDir = isMsgDirectory
             ? SanitizePath(
                 Path.GetFileName(Path.TrimEndingDirectorySeparator(folderPath))
@@ -108,9 +94,7 @@ class Program
         Console.WriteLine($"Output directory : {outputDir}");
         Console.WriteLine();
 
-        // -----------------------------------------------------------------------
         // 5. Fetch emails and convert each one to PDF.
-        // -----------------------------------------------------------------------
         try
         {
             MsgFileService? msgService = null;
@@ -182,12 +166,12 @@ class Program
                     }
                 }
 
-                //Console.Write($"  Processing: {email.Subject} ... ");
+                Console.Write($"  Processing: {email.Subject} ... ");
 
                 try
                 {
                     pdfService.SaveEmailAsPdf(email, outputPath);
-                    //Console.WriteLine($"saved → {outputPath}");
+                    Console.WriteLine($"saved → {outputPath}");
                     processed++;
                 }
                 catch (Exception ex)
@@ -234,9 +218,7 @@ class Program
         Console.ReadKey();
     }
 
-    // -------------------------------------------------------------------------
     // Helpers
-    // -------------------------------------------------------------------------
 
     // Build once; Path.GetInvalidFileNameChars() returns the same values every call.
     private static readonly HashSet<char> InvalidFileNameChars =
@@ -422,12 +404,9 @@ class Program
         }
     }
 
-    /// <summary>
-    /// Removes every dictionary term from anywhere within a file or folder name,
-    /// case-insensitively. After removal, consecutive spaces are collapsed and
-    /// any leading separators are trimmed.
-    /// Note: this method is intentionally NOT called for attachment file names.
-    /// </summary>
+    // Strips every dictionary term from a file/folder name (case-insensitive),
+    // then collapses runs of whitespace and trims leading separators.
+    // Not called for attachment file names.
     private static string StripDictionaryTerms(string? text, IReadOnlyList<string> patterns)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -442,18 +421,13 @@ class Program
                 result = result.Remove(idx, pattern.Length);
         }
 
-        // Collapse any runs of whitespace left behind by the removals.
         result = string.Join(" ", result.Split(' ', StringSplitOptions.RemoveEmptyEntries));
-
-        // Remove any stray leading separators or spaces.
         result = result.TrimStart(' ', '-', '_').Trim();
 
         return result;
     }
 
-    /// <summary>
-    /// Removes characters that are invalid in file names.
-    /// </summary>
+    // Replaces characters that are invalid in file names with underscores.
     private static string SanitizeFileName(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -463,17 +437,11 @@ class Program
         return result.Trim().TrimEnd('.');
     }
 
-    /// <summary>
-    /// Converts a folder path (e.g. "Inbox/Projects" or an absolute file-system
-    /// path) into a safe relative path for use as a directory name.
-    /// For absolute paths the generic OS prefix is stripped first:
-    ///   - Paths under the current user profile lose the C:\Users\&lt;username&gt; prefix.
-    ///   - All other rooted paths lose the drive root (e.g. "C:\").
-    /// </summary>
+    // Converts a folder path into a safe relative path for use as a directory name.
+    // For absolute paths, strips the drive root and user-profile prefix so that
+    // "C:", "Users", and the username never appear in the output folder name.
     private static string SanitizePath(string folderPath)
     {
-        // Strip generic OS prefix from absolute paths so that segments like
-        // "C:", "Users" and the username never appear in the output folder name.
         if (Path.IsPathRooted(folderPath))
         {
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -493,8 +461,6 @@ class Program
             }
         }
 
-        // Replace forward and back slashes with the OS directory separator,
-        // then sanitize each segment individually.
         string[] segments = folderPath.Split(new[] { '/', '\\' },
             StringSplitOptions.RemoveEmptyEntries);
 
@@ -505,16 +471,10 @@ class Program
         return Path.Combine(safeSegments);
     }
 
-    // -------------------------------------------------------------------------
     // Attachment saving helpers
-    // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Copies every attachment in <paramref name="email"/> to
-    /// <paramref name="attachmentsDir"/> in its original format.
-    /// ZIP attachments are extracted directly into <paramref name="attachmentsDir"/>
-    /// with no folder structure preserved.
-    /// </summary>
+    // Copies every attachment in the email to attachmentsDir in its original format.
+    // ZIP attachments are extracted and flattened directly into attachmentsDir.
     private static void SaveAttachmentsToFolder(EmailData email, string attachmentsDir)
     {
         Directory.CreateDirectory(attachmentsDir);
@@ -528,7 +488,6 @@ class Program
 
             if (string.Equals(ext, ".zip", StringComparison.OrdinalIgnoreCase))
             {
-                // Extract ZIP contents directly into the attachments folder.
                 ExtractZipToFolder(attachment.TempFilePath, attachmentsDir);
             }
             else
@@ -543,10 +502,8 @@ class Program
         }
     }
 
-    /// <summary>
-    /// Extracts a ZIP archive to <paramref name="extractDir"/> using a
-    /// zip-slip safe strategy and flattens all files into a single folder.
-    /// </summary>
+    // Extracts a ZIP archive into extractDir using a zip-slip-safe strategy,
+    // flattening all entries into a single folder.
     private static void ExtractZipToFolder(string zipPath, string extractDir)
     {
         Directory.CreateDirectory(extractDir);
@@ -556,11 +513,9 @@ class Program
             using var archive = ZipFile.OpenRead(zipPath);
             foreach (var entry in archive.Entries)
             {
-                // Skip directory-only entries.
                 if (string.IsNullOrEmpty(entry.Name))
                     continue;
 
-                // Flatten: ignore any subfolder path in the ZIP entry.
                 string safeFileName = SanitizeFileName(entry.Name);
                 if (string.IsNullOrWhiteSpace(safeFileName))
                     safeFileName = "file";
@@ -576,11 +531,7 @@ class Program
         }
     }
 
-    /// <summary>
-    /// Returns a path for a new file inside <paramref name="directory"/>.
-    /// If <paramref name="fileName"/> already exists, appends a numeric
-    /// counter (e.g. "report (2).docx") until a free name is found.
-    /// </summary>
+    // Returns a unique file path inside directory; appends a counter if the name is taken.
     private static string GetUniqueFilePath(string directory, string fileName)
     {
         string dest = Path.Combine(directory, fileName);
@@ -598,26 +549,4 @@ class Program
 
         return dest;
     }
-
-    /// <summary>
-    /// Returns a path for a new subdirectory inside <paramref name="parent"/>.
-    /// If the name already exists, appends a numeric counter until free.
-    /// </summary>
-    private static string GetUniqueDirectoryPath(string parent, string name)
-    {
-        string dest = Path.Combine(parent, name);
-        if (!Directory.Exists(dest))
-            return dest;
-
-        int counter = 2;
-        string candidate;
-        do
-        {
-            candidate = Path.Combine(parent, $"{name} ({counter++})");
-        }
-        while (Directory.Exists(candidate));
-
-        return candidate;
-    }
 }
-

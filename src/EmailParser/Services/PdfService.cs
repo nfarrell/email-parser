@@ -9,9 +9,7 @@ namespace EmailParser.Services;
 /// </summary>
 public class PdfService
 {
-    // -------------------------------------------------------------------------
     // Public API
-    // -------------------------------------------------------------------------
 
     /// <summary>
     /// Renders <paramref name="email"/> body to a PDF at <paramref name="outputPath"/>.
@@ -46,9 +44,7 @@ public class PdfService
         }
     }
 
-    // -------------------------------------------------------------------------
     // Email body → PDF
-    // -------------------------------------------------------------------------
 
     private static void ConvertEmailBodyToPdf(EmailData email, string outputPath)
     {
@@ -95,9 +91,7 @@ public class PdfService
             """;
     }
 
-    // -------------------------------------------------------------------------
     // Utility helpers
-    // -------------------------------------------------------------------------
 
     private static string HtmlEncode(string value) =>
         System.Net.WebUtility.HtmlEncode(value ?? string.Empty);

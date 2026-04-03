@@ -61,9 +61,7 @@ public class MsgFileService
         }
     }
 
-    // -------------------------------------------------------------------------
     // Private helpers
-    // -------------------------------------------------------------------------
 
     private static EmailData ReadMsgFile(string msgPath)
     {
